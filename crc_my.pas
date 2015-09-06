@@ -44,7 +44,7 @@ Var
 {$R *.dfm}
 
 // очень стабильная работа
-function Crc8My(data, c_pr:integer):byte;
+function Crc8_8(data, c_pr:byte):byte;
 Var
  ti:word;
 Begin
@@ -63,7 +63,9 @@ Begin
 {$RANGECHECKS ON}
 End;
 
-function Crc16My(data, c_pr:word):word;
+
+
+function Crc16_8(data, c_pr:word):word;
 Var
  ti:cardinal;
 
@@ -84,8 +86,23 @@ Begin
 {$RANGECHECKS ON}
 End;
 
+function Crc16_16(data, c_pr:word):word;
+Var
+ ti:cardinal;
+
+Begin
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+  ti:=c_pr + data*44111; //VERY GOOD!
+  result:=ti XOR (ti SHR 16);   //8-16 magik
+
+{$OVERFLOWCHECKS ON}
+{$RANGECHECKS ON}
+End;
+
+
 // тут вычисляем порциями по 8 бит
-Function CRC32My(data, c_pr:int64):cardinal;
+Function CRC32_8(data, c_pr:int64):cardinal;
 Var
  ti:int64;
 Begin
@@ -126,7 +143,7 @@ result:=ti AND $FFFFFF; //24 bit 16 mega
 end;
 
 // очень стабильная работа
-Function CRC64My(data, c_pr:int64):int64;
+Function CRC64_8(data, c_pr:int64):int64;
 Var
  ti:int64;
 Begin
@@ -144,11 +161,27 @@ result:=ti AND $FFFFF; //20 bit 1 mega удобно для тестировани
 result:=ti AND $FFFFF;
 end;
 
+// VERY GOOD 64 bit box
+Function CRC64_64(data, c_pr:int64):int64;
+Var
+ ti:int64;
+Begin
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+  ti:=c_pr+data*$5FB7D03C81AE5243;
+  ti:=ti XOR (ti SHR 32); // очень важно 32
+
+//result:=ti AND $FFFFFF; //24 bit 16 mega удобно для тестировани
+result:=ti AND $FFFFF; //20 bit 1 mega удобно для тестировани
+{$OVERFLOWCHECKS ON}
+{$RANGECHECKS ON}
+
+end;
 
 Procedure TestMain;
 Var
  i,j, er_c, e_num:integer;
- a,b:cardinal;
+ a,b:Int64;
  crc_rx, crc_tx:int64;
 // TeleTX8: array [1..array_work] of Byte;
 // TeleRX8: array [1..array_work] of Byte;
@@ -156,16 +189,14 @@ Var
 // TeleTX16: array [1..array_work] of Word;
 // TeleRX16: array [1..array_work] of Word;
 
- TeleTX32: array [1..array_work] of Cardinal;
- TeleRX32: array [1..array_work] of Cardinal;
+// TeleTX32: array [1..array_work] of Cardinal;
+// TeleRX32: array [1..array_work] of Cardinal;
 
-// TeleTX64: array [1..array_work] of Int64;
-// TeleRX64: array [1..array_work] of Int64;
+ TeleTX64: array [1..array_work] of Int64;
+ TeleRX64: array [1..array_work] of Int64;
 
 
  delta:integer;
- bc:integer;
- dat1,dat2:cardinal;
  odin_massiv:cardinal;
 Begin
 OnWork:=1;
@@ -190,16 +221,16 @@ begin
     //TeleRX16[j]:=a;
 
     // ~32 bit
-    a:=Random(MaxInt);
-    TeleTX32[j]:=a;
-    TeleRX32[j]:=a;
+    //a:=Random(MaxInt);
+    //TeleTX32[j]:=a;
+    //TeleRX32[j]:=a;
 
     // ~64 bit
-    //a:=Random(MaxInt);
-    //a:=a SHL 32;
-    //a:=a +Random(MaxInt);
-    //TeleTX64[j] :=a;
-    //TeleRX64[j]:=a;
+    a:=Random(MaxInt);
+    a:=a SHL 32;
+    a:=a +Random(MaxInt);
+    TeleTX64[j]:=a;
+    TeleRX64[j]:=a;
   end;
 
   // *************** add error ***************
@@ -207,18 +238,18 @@ begin
   for j := 1 to random(10)+1 do //************
     Begin
      e_num:=Random(array_work)+1;
-     a:=random(32);
+     a:=random(64); // 8 16 32 64 !!!
      b:=1 SHL a;
-     TeleTX32[e_num]:=TeleRX32[e_num] XOR b;
+     TeleTX64[e_num]:=TeleRX64[e_num] XOR b; // !!!
     end;
 
   delta:=0;
   for j := 1 to array_work do // число байт в телеграмме
-    if TeleRX32[j]<>TeleTX32[j] then
+    if TeleRX64[j]<>TeleTX64[j] then
       inc (delta);
 
   until (delta>0) or (Form1.CheckBox1.Checked=true);
-                        
+
 
   if delta=0 then
     inc(odin_massiv);
@@ -228,15 +259,11 @@ begin
   crc_rx:=0;
   crc_tx:=0;
 
-  bc:=0;
-  dat1:=0;
-  dat2:=0;
-
   for j := 1 to array_work do // число байт в телеграмме
   begin
 
-    crc_tx:=CRC32_32 (TeleTX32[j],crc_tx);
-    crc_rx:=CRC32_32 (TeleRX32[j],crc_rx);
+    //crc_tx:=CRC32_32 (TeleTX32[j],crc_tx);
+    //crc_rx:=CRC32_32 (TeleRX32[j],crc_rx);
 
     //crc_old:=CRC32My (tele[j],crc_old); // VERY GOOD!
     //crc:=CRC32My (tele2[j],crc);
@@ -244,11 +271,16 @@ begin
     //crc_old:=CRC16My (tele[j],crc_old);
     //crc:=CRC16My (tele2[j],crc);
 
+    //crc_tx:=CRC16_16 (TeleTX16[j],crc_tx);
+    //crc_rx:=CRC16_16 (TeleRX16[j],crc_rx);
+
+
     //crc_old:=CRC8My (tele[j],crc_old);
     //crc:=CRC8My (tele2[j],crc);
 
-    //crc_tx:=CRC64My (TeleTX8[j],crc_tx);
-    //crc_rx:=CRC64My (TeleRX8[j],crc_rx);
+    // 64 bit array
+    crc_tx:=CRC64_64 (TeleTX64[j],crc_tx);
+    crc_rx:=CRC64_64 (TeleRX64[j],crc_rx);
 
 
   end;
