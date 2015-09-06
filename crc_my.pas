@@ -102,7 +102,7 @@ Begin
 end;
 
 // тут вычисляем сразу порциями по 32 бита
-Function CRC32MyV2(data, c_pr:int64):cardinal;
+Function CRC32_32(data, c_pr:int64):cardinal;
 Var
  ti:int64;
  i:integer;
@@ -147,11 +147,21 @@ end;
 
 Procedure TestMain;
 Var
- b,i,j, er_c, e_num:integer;
- a:cardinal;
+ i,j, er_c, e_num:integer;
+ a,b:cardinal;
  crc_rx, crc_tx:int64;
- TeleTX8: array [1..array_work] of byte;
- TeleRX8: array [1..array_work] of byte;
+// TeleTX8: array [1..array_work] of Byte;
+// TeleRX8: array [1..array_work] of Byte;
+
+// TeleTX16: array [1..array_work] of Word;
+// TeleRX16: array [1..array_work] of Word;
+
+ TeleTX32: array [1..array_work] of Cardinal;
+ TeleRX32: array [1..array_work] of Cardinal;
+
+// TeleTX64: array [1..array_work] of Int64;
+// TeleRX64: array [1..array_work] of Int64;
+
 
  delta:integer;
  bc:integer;
@@ -166,17 +176,30 @@ odin_massiv:=0;
 for I := 1 to Iterations do // число телеграм
 begin
 //crc:=0;
-  if (I mod 10) = 0 then // оптимизация цикла, особенно если телеграмма длинная
+  if (I mod 10) = 1 then // оптимизация цикла, особенно если телеграмма длинная
   for j := 1 to array_work do // число байт в телеграмме
   begin
-    a:=Random(256);
-    TeleTX8[j] :=a;
-    TeleRX8[j]:=a;
+    // 8 bit
+    //a:=Random($FF+1);
+    //TeleTX8[j] :=a;
+    //TeleRX8[j]:=a;
 
+    // 16 bit
+    //a:=Random($FFFF+1);
+    //TeleTX16[j] :=a;
+    //TeleRX16[j]:=a;
 
+    // ~32 bit
+    a:=Random(MaxInt);
+    TeleTX32[j]:=a;
+    TeleRX32[j]:=a;
 
-
-
+    // ~64 bit
+    //a:=Random(MaxInt);
+    //a:=a SHL 32;
+    //a:=a +Random(MaxInt);
+    //TeleTX64[j] :=a;
+    //TeleRX64[j]:=a;
   end;
 
   // *************** add error ***************
@@ -184,14 +207,14 @@ begin
   for j := 1 to random(10)+1 do //************
     Begin
      e_num:=Random(array_work)+1;
-     a:=random(8);
+     a:=random(32);
      b:=1 SHL a;
-     TeleTX8[e_num]:=TeleRX8[e_num] XOR b;
+     TeleTX32[e_num]:=TeleRX32[e_num] XOR b;
     end;
 
   delta:=0;
   for j := 1 to array_work do // число байт в телеграмме
-    if TeleRX8[j]<>TeleTX8[j] then
+    if TeleRX32[j]<>TeleTX32[j] then
       inc (delta);
 
   until (delta>0) or (Form1.CheckBox1.Checked=true);
@@ -212,22 +235,8 @@ begin
   for j := 1 to array_work do // число байт в телеграмме
   begin
 
-    // это всё для блока CRC32 "большого"
-    {dat1:=dat1 SHL 8;
-    dat1:=dat1 + tele[j];
-
-    dat2:=dat2 SHL 8;
-    dat2:=dat2 + tele2[j];
-
-    inc (bc);
-    if (bc>=4) or (j=array_work) then
-    begin
-      crc_old:=CRC32MyV2 (dat1,crc_old);
-      crc:=CRC32MyV2 (dat2,crc);
-      bc:=0;
-      dat1:=0;
-      dat2:=0;
-    end;}
+    crc_tx:=CRC32_32 (TeleTX32[j],crc_tx);
+    crc_rx:=CRC32_32 (TeleRX32[j],crc_rx);
 
     //crc_old:=CRC32My (tele[j],crc_old); // VERY GOOD!
     //crc:=CRC32My (tele2[j],crc);
@@ -238,8 +247,8 @@ begin
     //crc_old:=CRC8My (tele[j],crc_old);
     //crc:=CRC8My (tele2[j],crc);
 
-    crc_tx:=CRC64My (TeleTX8[j],crc_tx);
-    crc_rx:=CRC64My (TeleRX8[j],crc_rx);
+    //crc_tx:=CRC64My (TeleTX8[j],crc_tx);
+    //crc_rx:=CRC64My (TeleRX8[j],crc_rx);
 
 
   end;
